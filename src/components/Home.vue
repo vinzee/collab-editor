@@ -1,27 +1,22 @@
 <template>
   <div>
+    <h1>CRDT implementation</h1>
+    <p>Mode: Javascript</p>
     <div id="editor"></div>
-
-    <!-- <button id="btn1">my button</button> -->
   </div>
 </template>
-
-<style>
-  #editor {
-      margin: 0;
-      width: 100%;
-      height: 32em;
-      margin-top: 5px;
-      font-size: 14px;
-  }
-</style>
 
 <script>
 	import $ from 'jQuery'
   import autobahn from 'autobahn'
+  import Automerge from 'automerge'
+
+  let editor,
+      doc = Automerge.init();
 
   $(document).ready(function () {
-    var editor = window.editor = ace.edit("editor");
+    editor = window.editor = ace.edit("editor");
+    editor.$blockScrolling = Infinity;
     editor.setTheme("ace/theme/monokai");
     editor.setShowPrintMargin(false);
     editor.session.setMode("ace/mode/javascript");
@@ -30,41 +25,50 @@
     editor.clearSelection();
   });
 
-  var connection = window.connection = new autobahn.Connection({
-    url: "ws://127.0.0.1:8080/ws",
+  const connection = window.connection = new autobahn.Connection({
+    url: "ws://localhost:8080/ws",
     realm: "realm1"
   });
 
   connection.onopen = function (session, details) {
     console.log("Connected : ", details);
 
-    $(document).ready(function () {
+    // $(document).ready(function () {
 
-      // editor.getSession().on('change', function(e) {
-      //     if(!window.editor._ignore_changes){
-      //       console.log("editor change", e, e.data);
-      //       session.publish('collab.change', [e]);
-      //     }
-      // });
+      editor.getSession().on('change', function(e) {
+          if(!window.editor._ignore_changes){
+            console.log("editor change", e, e.data);
+
+            doc = Automerge.change(doc, 'Initialize card list', doc => {
+              doc.cards = []
+            })
+
+            session.publish('collab.change', [e]);
+          }
+      });
 
       // editor.getSession().selection.on('changeSelection', function(e) {
-          // console.log("editor changeSelection", e);
-          // session.publish('collab.changeSelection', [ e, editor.getSelectionRange() ]);
+      //     console.log("editor changeSelection", e);
+      //     session.publish('collab.changeSelection', [ e, editor.getSelectionRange() ]);
       // });
 
       editor.getSession().selection.on('changeCursor', function(e) {
-          console.log("editor changeCursor", e, editor.getCursorPosition());
-          session.publish('collab.changeCursor', [ e, editor.getCursorPosition() ]);
+          if(!window.editor._ignore_cursor_changes){
+            console.log("editor changeCursor", e, editor.getCursorPosition());
+            session.publish('collab.changeCursor', [ e, editor.getCursorPosition() ]);
+          }
       });
-    });
 
-    var subcriptions = {
-      'collab.change' : onChange,
-      'collab.changeSelection' : onChangeSelection,
-      'collab.changeCursor' : onChangeCursor
+    // }); $ready
+
+    const subcriptions = {
+      'collab.change' : change,
+      // 'collab.changeSelection' : changeSelection,
+      'collab.changeCursor' : changeCursor
     }
 
     for(var topic in subcriptions){
+      console.log(topic)
       session.subscribe(topic, subcriptions[topic]).then(function (sub) {
           console.log("subscribed to topic " + topic);
       }, function (err) {
@@ -73,35 +77,32 @@
     }
   }
 
-  function onChange (args) {
+  function change (args) {
      // var msg = args[0];
-     console.log("received onChange: ", args);
-     window.editor._ignore_changes = true;
-     window.editor.getSession().getDocument().applyDeltas(args);
-     window.editor._ignore_changes = false;
+     console.log("received change: ", args);
+     editor._ignore_changes = true;
+     editor.getSession().getDocument().applyDeltas(args);
+     editor._ignore_changes = false;
   }
 
-  function onChangeSelection (args) {
+  function changeSelection (args) {
      // var msg = args[0];
-     console.log("received onChangeSelection: ", args);
-     window.editor._ignore_changes = true;
-     window.editor.clearSelection();
-     window.editor.selection.addRange(args[1]); // true
+     console.log("received changeSelection: ", args);
+     editor._ignore_changes = true;
+     editor.clearSelection();
+     editor.selection.addRange(args[1]); // true
 
-     // window.editor.getSession().getDocument().applyDeltas(args);
-     window.editor._ignore_changes = false;
+     // editor.getSession().getDocument().applyDeltas(args);
+     editor._ignore_changes = false;
   }
 
-  function onChangeCursor (args) {
+  function changeCursor (args) {
      // var msg = args[0];
-     console.log("received onChangeCursor: ", args[1].row, args[1].column);
-     // window.editor._ignore_changes = true;
-     window.editor.getSession().getDocument().applyDeltas(args);
-     // window.editor.selection.moveCursorTo(args[1].row, args[1].column);
-     window.editor.gotoLine(args[1].row, args[1].column, true);
-     window.editor.session.insert({row: 0, column: 0} , "hey");
+     console.log("received changeCursor: ", args[1].row, args[1].column);
+     editor._ignore_cursor_changes = true;
+     editor.selection.moveCursorTo(args[1].row, args[1].column);
 
-     // window.editor._ignore_changes = false;
+     editor._ignore_cursor_changes = false;
   }
 
   // fired when connection was lost (or could not be established)
@@ -113,3 +114,13 @@
   connection.open();
 
 </script>
+
+<style>
+  #editor {
+      margin: 0;
+      width: 100%;
+      height: 32em;
+      margin-top: 5px;
+      font-size: 14px;
+  }
+</style>
