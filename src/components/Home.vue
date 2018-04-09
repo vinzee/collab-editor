@@ -23,7 +23,7 @@
       this.doc = Automerge.init();
 
       this.editor = window.editor = ace.edit("editor");
-      // this.editor.$blockScrolling = Infinity;
+      this.editor.$blockScrolling = Infinity;
       this.editor.setTheme("ace/theme/monokai");
       this.editor.setShowPrintMargin(false);
       this.editor.session.setMode("ace/mode/javascript");
