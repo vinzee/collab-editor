@@ -11,10 +11,13 @@
     "unit": "cross-env BABEL_ENV=test karma start test/unit/karma.conf.js --single-run",
     "e2e": "node test/e2e/runner.js",
     "test": "npm run unit && npm run e2e",
-    "lint": "eslint --ext .js,.vue src test/unit/specs test/e2e/specs"
+    "lint": "eslint --ext .js,.vue src test/unit/specs test/e2e/specs",
+    "crossbar2": "crossbar start --cbdir pypy-venv/.crossbar",
+    "crossbar": "crossbar start --cbdir /Users/vinzee/python-venv/.crossbar"
   },
   "dependencies": {
     "autobahn": "^17.5.2",
+    "automerge": "^0.7.1",
     "jquery": "^3.2.1",
     "underscore": "^1.8.3",
     "vue": "^2.4.2",
