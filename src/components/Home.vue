@@ -21,18 +21,22 @@
       const self = this
 
       this.doc = Automerge.init();
+      this.doc = Automerge.change(this.doc, doc => {
+        doc.text = new Automerge.Text()
+      });
 
-      this.editor = window.editor = ace.edit("editor");
+      window.editor = this.editor = ace.edit("editor");
+      this.editor.setOption("maxLines", 1);
       this.editor.$blockScrolling = Infinity;
       this.editor.setTheme("ace/theme/monokai");
       this.editor.setShowPrintMargin(false);
       this.editor.session.setMode("ace/mode/javascript");
       this.editorMode = this.editor.session.getMode().$id;
-      this.editor.setValue("console.log('Hello World !')");
+      this.editor.setValue("console.log('HAT')");
       this.editor.$blockScrolling = Infinity;
       this.editor.clearSelection();
 
-      this.connection = new autobahn.Connection({
+      window.connection = this.connection = new autobahn.Connection({
         url: "ws://localhost:8080/ws",
         realm: "realm1"
       });
@@ -42,8 +46,23 @@
 
         self.editor.getSession().on('change', function(e) {
           if (self.editor.curOp && self.editor.curOp.command.name) {
-            console.log("current_user change");
-            session.publish('collab.change', [e]);
+            console.log("current_user change: ", e);
+
+            // self.doc = Automerge.change(self.doc, doc => {
+            //     if (e.action === 'insert') {
+            //       doc.text.insertAt(e.start.column, e.lines[0]);
+            //     } else if (e.action === 'delete') {
+            //       doc.text.deleteAt(e.start.column);
+            //     }
+            //   // doc.text.insertAt(0, 'h', 'e', 'l', 'l', 'o')
+            //   // doc.text.deleteAt(0)
+            //   // doc.text.insertAt(0, 'H')
+            // })
+
+            setTimeout(() => {
+              session.publish('collab.change', [e]);
+            }, 10000);
+
           } else {
             console.log("peer change")
           }
@@ -72,8 +91,6 @@
           'collab.changeSelection' : self.changeSelection,
           'collab.changeCursor' : self.changeCursor
         }
-
-        console.log('self.subscriptions: ', self.subscriptions)
 
         for(let topic in self.subscriptions){
           session.subscribe(topic, self.subscriptions[topic]).then(function (sub) {
