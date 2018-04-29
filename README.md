@@ -29,7 +29,7 @@ npm test
 
 For detailed explanation on how things work, checkout the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
 
+## Links
 
-    "indent": [2, 2, { "SwitchCase": 1 }],
-    // "space-before-function-paren": [2, "always"],
-    // "quotes": [2, "single", { "avoidEscape": true, "allowTemplateLiterals": true }],
+- https://github.com/automerge/automerge
+- https://github.com/crossbario/autobahn-js
