@@ -7,9 +7,13 @@
 </template>
 
 <script>
-	import $ from 'jQuery'
+	// import $ from 'jQuery'
   import autobahn from 'autobahn'
   import Automerge from 'automerge'
+  import {Event} from '../utils/event.js'
+
+  window.Event = Event;
+  window.Automerge = Automerge;
 
   export default {
     data () {
@@ -19,11 +23,6 @@
     },
     mounted () {
       const self = this
-
-      this.doc = Automerge.init();
-      this.doc = Automerge.change(this.doc, doc => {
-        doc.text = new Automerge.Text()
-      });
 
       window.editor = this.editor = ace.edit("editor");
       this.editor.setOption("maxLines", 1);
@@ -42,26 +41,48 @@
       });
 
       this.connection.onopen = function (session, details) {
-        console.log("WAMP Connected : ", details);
+        window.session = session;
+
+      console.log("WAMP Connected : ", details);
+
+      session.call('getDoc').then(
+        function (res) {
+          console.log("Initializing doc...");
+          window.doc = Automerge.load(res);
+      }).catch(function (res) {
+          console.log("Error:", res);
+          window.doc = Automerge.init();
+          window.doc = Automerge.change(window.doc, doc => {
+            doc.text = new Automerge.Text()
+            doc.text.insertAt(0, ...self.editor.getValue().split(''));
+          });
+
+          session.register('getDoc', (args) => {
+            return Automerge.save(window.doc);
+          });
+      });
 
         self.editor.getSession().on('change', function(e) {
           if (self.editor.curOp && self.editor.curOp.command.name) {
             console.log("current_user change: ", e);
 
-            // self.doc = Automerge.change(self.doc, doc => {
-            //     if (e.action === 'insert') {
-            //       doc.text.insertAt(e.start.column, e.lines[0]);
-            //     } else if (e.action === 'delete') {
-            //       doc.text.deleteAt(e.start.column);
-            //     }
-            //   // doc.text.insertAt(0, 'h', 'e', 'l', 'l', 'o')
-            //   // doc.text.deleteAt(0)
-            //   // doc.text.insertAt(0, 'H')
-            // })
+            let newDoc = Automerge.change(window.doc, doc => {
+                if (e.action === 'insert') {
+                  doc.text.insertAt(e.start.column, e.lines[0]);
+                } else if (e.action === 'delete') {
+                  doc.text.deleteAt(e.start.column);
+                }
+            })
 
-            setTimeout(() => {
-              session.publish('collab.change', [e]);
-            }, 10000);
+            let changes = Automerge.getChanges(window.doc, newDoc)
+
+            session.publish('collab.change', [JSON.stringify(changes)]);
+            // setTimeout(() => {
+              // session.publish('collab.change', [JSON.stringify(changes)]);
+            // }, 10000);
+
+            window.doc = newDoc;
+
 
           } else {
             console.log("peer change")
@@ -86,10 +107,40 @@
           }
         });
 
+        Event.$on('collab.change', (args) => {
+            try {
+              // FIXME - this.editor does not work here
+              // window.editor.getSession().getDocument().applyDeltas(args);
+              console.log("before change ", window.doc.text);
+
+              window.doc = Automerge.applyChanges(window.doc, JSON.parse(args[0]));
+
+              console.log("after change ", window.doc.text);
+
+              // Automerge.getHistory(window.doc)
+              // .map(state => console.log(state));
+
+              window.editor.setValue(window.doc.text.join(''));
+            } catch (e) {
+              console.log(e);
+            }
+        });
+
         self.subscriptions = {
-          'collab.change' : self.change,
-          'collab.changeSelection' : self.changeSelection,
-          'collab.changeCursor' : self.changeCursor
+          'collab.change': (args) => {
+            console.log("received change: ", args);
+            window.Event.$emit('collab.change', args);
+          },
+          'collab.changeSelection' : (args) => {
+             console.log("received changeSelection: ", args);
+             // window.editor.clearSelection();
+             window.editor.selection.addRange(args[1]); // true
+          },
+          'collab.changeCursor' : (args) => {
+             console.log("received changeCursor: ", args[0].row, args[0].column);
+             window.editor.selection.moveCursorTo(args[0].row, args[0].column);
+          }
+
         }
 
         for(let topic in self.subscriptions){
@@ -108,22 +159,7 @@
 
       this.connection.open();
     },
-
     methods: {
-      change: (args) => {
-         console.log("received change: ", args);
-         // FIXME - this.editor does not work here
-         window.editor.getSession().getDocument().applyDeltas(args);
-      },
-      changeSelection: (args) => {
-         console.log("received changeSelection: ", args);
-         // window.editor.clearSelection();
-         window.editor.selection.addRange(args[1]); // true
-      },
-      changeCursor: (args) => {
-         console.log("received changeCursor: ", args[0].row, args[0].column);
-         window.editor.selection.moveCursorTo(args[0].row, args[0].column);
-      }
     }
   }
 </script>
