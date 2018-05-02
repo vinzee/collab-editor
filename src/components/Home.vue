@@ -49,6 +49,13 @@
         function (res) {
           console.log("Fetching initial doc...");
           window.doc = Automerge.load(res);
+
+          let str = "";
+
+          for(let i = 0; i < window.doc.text.length; i++) {
+            str += window.doc.text[i].join('') + "\n";
+          }
+          window.editor.setValue(str);
       }).catch(function (res) {
           console.log("Error:", res);
           window.doc = Automerge.init();
@@ -60,6 +67,7 @@
           console.log("Creating doc...", window.doc);
 
           session.register('getDoc', (args) => {
+            console.log('getDoc: ', window.doc.text[0].join(''), Automerge.save(window.doc));
             return Automerge.save(window.doc);
           });
       });
@@ -90,9 +98,9 @@
 
             let changes = Automerge.getChanges(window.doc, newDoc)
 
-            setTimeout(() => {
+            // setTimeout(() => {
               session.publish('collab.change', [JSON.stringify(changes)]);
-            }, 5000);
+            // }, 5000);
 
             window.doc = newDoc;
 
