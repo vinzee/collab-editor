@@ -64,10 +64,9 @@
             doc.text.push(new Automerge.Text())
             doc.text[0].insertAt(0, ...self.editor.getValue().split(''));
           });
-          console.log("Creating doc...", window.doc);
+          console.log("Creating doc...");
 
           session.register('getDoc', (args) => {
-            console.log('getDoc: ', window.doc.text[0].join(''), Automerge.save(window.doc));
             return Automerge.save(window.doc);
           });
       });
@@ -99,7 +98,8 @@
             let changes = Automerge.getChanges(window.doc, newDoc)
 
             // setTimeout(() => {
-              session.publish('collab.change', [JSON.stringify(changes)]);
+              // session.publish('collab.change', [e]);
+              session.publish('collab.change', [changes]);
             // }, 5000);
 
             window.doc = newDoc;
@@ -132,11 +132,8 @@
             try {
               // FIXME - this.editor does not work here
               // window.editor.getSession().getDocument().applyDeltas(args);
-              console.log("before change ", window.doc.text);
 
-              window.doc = Automerge.applyChanges(window.doc, JSON.parse(args[0]));
-
-              console.log("after change ", window.doc.text);
+              window.doc = Automerge.applyChanges(window.doc, args[0]);
 
               // Automerge.getHistory(window.doc)
               // .map(state => console.log(state));
