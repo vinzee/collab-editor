@@ -6,7 +6,6 @@
 </template>
 
 <script>
-	import $ from 'jQuery'
   import autobahn from 'autobahn'
 
   export default {
@@ -18,7 +17,6 @@
       this.editor.setShowPrintMargin(false);
       this.editor.session.setMode("ace/mode/javascript");
       this.editor.setValue("console.log('HAT')");
-      this.editor.$blockScrolling = Infinity;
       this.editor.clearSelection();
 
       this.connection = new autobahn.Connection({

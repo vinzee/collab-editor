@@ -1,12 +1,15 @@
 <template>
   <div>
-    <h1>With CRDT</h1>
+    <h1>CRDT using websockets (WAMP)</h1>
     <div id="editor"></div>
+
+    <h2>Changes</h2>
+    <div ref="history"></div>
   </div>
 </template>
 
 <script>
-  import $ from 'jQuery'
+  import _ from 'lodash'
   import autobahn from 'autobahn'
   import Automerge from 'automerge'
 
@@ -18,8 +21,7 @@
       this.editor.setTheme("ace/theme/monokai");
       this.editor.setShowPrintMargin(false);
       this.editor.session.setMode("ace/mode/javascript");
-      this.editor.setValue("console.log('HAT')");
-      this.editor.$blockScrolling = Infinity;
+      this.editor.setValue("HAT");
       this.editor.clearSelection();
 
       this.connection = new autobahn.Connection({
@@ -34,12 +36,12 @@
           // Automerge.getHistory(this.doc)
           // .map(state => console.log(state));
 
-          session.call('getDoc').then(
-            function (res) {
+          session.call('getDoc').then((res) => {
               console.log("Fetching initial doc...");
               this.doc = Automerge.load(res);
               this.updateEditor();
-          }.bind(this)).catch(function (res) {
+              this.updateHistory();
+          }).catch((res) => {
               console.log("Error:", res);
               this.doc = Automerge.init();
               this.doc = Automerge.change(this.doc, doc => {
@@ -47,22 +49,23 @@
                 doc.text.push(new Automerge.Text())
                 doc.text[0].insertAt(0, ...this.editor.getValue().split(''));
               });
+              this.updateHistory();
               console.log("Creating doc...");
 
               session.register('getDoc', (args) => {
                 return Automerge.save(this.doc);
               });
-          }.bind(this));
+          });
 
-          this.editor.getSession().on('change', function(e) {
+          this.editor.getSession().on('change', (e) => {
             if (this.editor.curOp && this.editor.curOp.command.name) {
               console.log("current_user change: ", e);
 
               let newDoc = Automerge.change(this.doc, doc => {
                   if (e.action === 'insert') {
                     if (doc.text[e.start.row] === undefined){
-                      doc.text.splice[e.start.row];
-                      doc.text.push(new Automerge.Text());
+                      // doc.text.splice[e.start.row];
+                      doc.text.push(new Automerge.Text()); // create new row
                     }
 
                     doc.text[e.start.row].insertAt(e.start.column, e.lines[0]);
@@ -83,59 +86,62 @@
                 session.publish('collab.change', [changes]);
               // }, 5000);
 
-              this.doc = newDoc;
 
+              this.doc = newDoc;
+              this.updateHistory();
             } else {
               console.log("peer change")
             }
-          }.bind(this));
+          });
 
-          this.editor.getSession().selection.on('changeSelection', function(e) {
+          this.editor.getSession().selection.on('changeSelection', (e) => {
               if (this.editor.curOp && this.editor.curOp.command.name) {
                 // console.log("current_user changeSelection", e);
                 session.publish('collab.changeSelection', [ e, this.editor.getSelectionRange() ]);
               } else {
                 // console.log("peer changeSelection");
               }
-          }.bind(this));
+          });
 
-          this.editor.getSession().selection.on('changeCursor', function(e) {
+          this.editor.getSession().selection.on('changeCursor', (e) => {
             if (this.editor.curOp && this.editor.curOp.command.name) {
               // console.log("current_user changeCursor", this.editor.getCursorPosition());
               session.publish('collab.changeCursor', [ this.editor.getCursorPosition() ]);
             } else {
               // console.log("peer changeCursor");
             }
-          }.bind(this));
+          });
 
           this.subscriptions = {
-            'collab.change': function (args) {
+            'collab.change': (args) => {
               console.log("received change: ", args, this);
               try {
                 this.doc = Automerge.applyChanges(this.doc, args[0]);
                 this.updateEditor();
+                this.updateHistory();
               } catch (e) {
                 console.log(e);
               }
-            }.bind(this),
-            'collab.changeSelection' : function (args) {
+            },
+            'collab.changeSelection' : (args) => {
                // console.log("received changeSelection: ", args);
                // this.editor.clearSelection();
                this.editor.selection.addRange(args[1]); // true
-            }.bind(this),
-            'collab.changeCursor' : function (args) {
+            },
+            'collab.changeCursor' : (args) => {
                // console.log("received changeCursor: ", args[0].row, args[0].column);
                this.editor.selection.moveCursorTo(args[0].row, args[0].column);
-            }.bind(this)
+            }
           }
 
-          for(let topic in this.subscriptions){
-            session.subscribe(topic, this.subscriptions[topic]).then(function (sub) {
+          _.each(this.subscriptions, (callback, topic) => {
+            console.log(topic);
+            session.subscribe(topic, callback).then(function (sub) {
                 console.log("subscribed to topic " + topic);
             }, function (err) {
                 console.error("Failed to subscribe to " + topic + " : " + err);
             });
-          }
+          });
         } catch (e) {
           console.log(e);
         }
@@ -156,6 +162,17 @@
           str += this.doc.text[i].join('') + "\n";
         }
         this.editor.setValue(str);
+      },
+      updateHistory () {
+        let innerHTML = '';
+        let i = 0;
+        Automerge.getHistory(this.doc).map(state => {
+          _.each(state.change.ops, (op) => {
+            innerHTML += ('<p><b>' + i++ + ')</b> ' + JSON.stringify(op) + '</p>');
+          });
+        });
+
+        this.$refs.history.innerHTML = innerHTML;
       }
     }
   }
@@ -164,8 +181,8 @@
 <style>
   #editor {
       margin: 0;
-      width: 100%;
-      height: 40em;
+      width: 80%;
+      height: 10em;
       margin-top: 5px;
       font-size: 14px;
   }
