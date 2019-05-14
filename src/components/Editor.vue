@@ -8,12 +8,12 @@
 
     <div class="md-layout md-alignment-top-center">
       <div class="md-layout-item md-size-80">
-        <div v-bind:id="editorID" class="editor"></div>
+        <div :id=editorID class="editor"></div>
       </div>
     </div>
 
-    <h2>History</h2>
-    <div ref="history"></div>
+    <h4>History</h4>
+    <div ref="history" class="history"></div>
   </div>
 </template>
 
@@ -72,7 +72,6 @@
           str += this.doc.text[i].join('') + '\n';
         }
 
-        console.log('updateEditor: ', str);
         this.editor.setValue(str);
       },
       updateHistory () {
@@ -96,7 +95,6 @@
         if(data.origin != this.editorID){
           // this.doc = Automerge.applyChanges(this.doc, data.changes);
           this.doc = Automerge.merge(this.doc, data.changes)
-          console.log(this.doc.text[0].join(''));
           this.updateEditor();
           this.updateHistory();
         }
@@ -155,5 +153,8 @@
       height: 15em;
       margin-top: 20px;
       font-size: 14px;
+  }
+  .history {
+    font-size: 12px;
   }
 </style>
